@@ -54,13 +54,13 @@ func (s *Server) setupRouter() {
 		// Stats endpoints
 		api.GET("/stats", s.getStats)
 		api.GET("/stats/:proxy_id", s.getProxyStats)
-
-		// Metrics
-		api.GET("/metrics", func(c *gin.Context) {
-			handler := promhttp.Handler()
-			handler.ServeHTTP(c.Writer, c.Request)
-		})
 	}
+
+	// Metrics
+	r.GET("/metrics", func(c *gin.Context) {
+		handler := promhttp.Handler()
+		handler.ServeHTTP(c.Writer, c.Request)
+	})
 
 	s.router = r
 	s.srv = &http.Server{
