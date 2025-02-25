@@ -3,3 +3,6 @@ exclude:
   - ^ai_intro.md
   - ^dump.md
   - ^go.sum
+  - ^web/public/favicon.ico
+  - ^web/package-lock.json
+  - ^web/src/components

@@ -13,9 +13,11 @@ services:
       redis:
         condition: service_started
       kafka:
-        condition: service_started
+        condition: service_healthy
     environment:
       - CONFIG_FILE=/app/config/config.yaml
+    networks:
+      - default
 
   frontend:
     build:
@@ -24,9 +26,12 @@ services:
     ports:
       - "${FRONTEND_PORT:-8000}:80"
     depends_on:
-      - backend
+      backend:
+        condition: service_started
     environment:
       - BACKEND_PORT=${BACKEND_PORT:-8080}
+    networks:
+      - default
 
   migrator:
     build:
@@ -36,6 +41,8 @@ services:
       postgres:
         condition: service_healthy
         restart: true
+    networks:
+      - default
 
   postgres:
     image: postgres:latest
@@ -53,11 +60,15 @@ services:
       POSTGRES_DB: abtest
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    networks:
+      - default
 
   redis:
     image: redis:7
     ports:
       - "${REDIS_PORT:-6379}:6379"
+    networks:
+      - default
 
   kafka-ui:
     image: provectuslabs/kafka-ui:latest
@@ -66,6 +77,8 @@ services:
       KAFKA_CLUSTERS_0_NAME: local
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
       SERVER_SERVLET_CONTEXT_PATH: /kafka-ui
+    networks:
+      - default
 
   kafka:
     image: confluentinc/cp-kafka:7.7.1
@@ -91,6 +104,8 @@ services:
       KAFKA_CONTROLLER_QUORUM_VOTERS: "1@kafka:29093"
       CLUSTER_ID: 'MkU3OEVBNTcwNTJENDM2Qk'
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: true
+    networks:
+      - default
 
   kafka-consumer:
     environment:
@@ -106,6 +121,8 @@ services:
         condition: service_healthy
       postgres:
         condition: service_healthy
+    networks:
+      - default
 
   prometheus:
     image: prom/prometheus:latest
@@ -118,6 +135,8 @@ services:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--web.external-url=/prom/'
       - '--storage.tsdb.path=/prometheus'
+    networks:
+      - default
 
   grafana:
     image: grafana/grafana:latest
@@ -129,8 +148,14 @@ services:
       GF_SECURITY_ALLOW_EMBEDDING: "true"
       GF_SECURITY_COOKIE_SECURE: "false"
       GF_SECURITY_COOKIE_SAMESITE: "disabled"
+    networks:
+      - default
 
 volumes:
   postgres_data:
   prometheus_data:
   grafana_data:
+
+networks:
+  default:
+    driver: bridge
