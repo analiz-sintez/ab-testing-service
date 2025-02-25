@@ -21,14 +21,22 @@ A Go-based service for splitting web traffic for A/B testing purposes. The servi
 ## Quick Start
 
 1. Clone the repository
-2. Start the services using Docker Compose:
+
+2. Login into Github container registry (GHCR):
+   - acquire token for ghcr (Github settings -> developer settings -> personal access tokens)
+   - use it as password for `docker login ghcr.io`
+
+2. Start the services using Docker Compose (use `-d` to run program in the background):
    ```bash
-   docker-compose up -d
+   docker-compose up
    ```
 
-3. The service will be available at:
-   - REST API: http://localhost:8080
-   - Prometheus metrics: http://localhost:9090
+3. The service will be available at (ports can be reassigned in `.env`):
+   - UI: http://localhost:38000
+   - REST API: http://localhost:38080
+   - prometheus: http://localhost:38000/prom
+   - kafka-ui: http://localhost:38000/kafka-ui
+   - grafana metrics: http://localhost:38000/grafana
 
 ## API Endpoints
 
