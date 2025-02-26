@@ -39,8 +39,8 @@ jobs:
           tags: |
             ghcr.io/${{ github.repository }}-backend:latest
             ghcr.io/${{ github.repository }}-backend:${{ github.ref_name }}
-          #   ${{ secrets.DOCKERHUB_USER }}/${{ github.event.repository.name }}:latest
-          #   ${{ secrets.DOCKERHUB_USER }}/${{ github.event.repository.name }}:${{ github.ref_name }}
+          #   ${{ secrets.DOCKERHUB_USER }}/${{ github.event.repository.name }}-backend:latest
+          #   ${{ secrets.DOCKERHUB_USER }}/${{ github.event.repository.name }}-backend:${{ github.ref_name }}
 
       - name: Build and push Docker image for frontend
         uses: docker/build-push-action@v3
@@ -52,8 +52,8 @@ jobs:
           tags: |
             ghcr.io/${{ github.repository }}-frontend:latest
             ghcr.io/${{ github.repository }}-frontend:${{ github.ref_name }}
-          #   ${{ secrets.DOCKERHUB_USER }}/${{ github.event.repository.name }}:latest
-          #   ${{ secrets.DOCKERHUB_USER }}/${{ github.event.repository.name }}:${{ github.ref_name }}
+          #   ${{ secrets.DOCKERHUB_USER }}/${{ github.event.repository.name }}-frontend:latest
+          #   ${{ secrets.DOCKERHUB_USER }}/${{ github.event.repository.name }}-frontend:${{ github.ref_name }}
 
       - name: Build and push Docker image for migrator
         uses: docker/build-push-action@v3
@@ -65,5 +65,18 @@ jobs:
           tags: |
             ghcr.io/${{ github.repository }}-migrator:latest
             ghcr.io/${{ github.repository }}-migrator:${{ github.ref_name }}
-          #   ${{ secrets.DOCKERHUB_USER }}/${{ github.event.repository.name }}:latest
-          #   ${{ secrets.DOCKERHUB_USER }}/${{ github.event.repository.name }}:${{ github.ref_name }}
+          #   ${{ secrets.DOCKERHUB_USER }}/${{ github.event.repository.name }}-migrator:latest
+          #   ${{ secrets.DOCKERHUB_USER }}/${{ github.event.repository.name }}-migrator:${{ github.ref_name }}
+
+      - name: Build and push Docker image for kafka-consumer
+        uses: docker/build-push-action@v3
+        with:
+          context  : .
+          file     : stat-consumer/Dockerfile
+          platforms: linux/amd64
+          push     : true
+          tags: |
+            ghcr.io/${{ github.repository }}-kafka-consumer:latest
+            ghcr.io/${{ github.repository }}-kafka-consumer:${{ github.ref_name }}
+          #   ${{ secrets.DOCKERHUB_USER }}/${{ github.event.repository.name }}-kafka-consumer:latest
+          #   ${{ secrets.DOCKERHUB_USER }}/${{ github.event.repository.name }}-kafka-consumer:${{ github.ref_name }}

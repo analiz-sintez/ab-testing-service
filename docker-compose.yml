@@ -111,14 +111,14 @@ services:
       - default
 
   kafka-consumer:
+    build:
+      context: .
+      dockerfile: stat-consumer/Dockerfile
     environment:
       kafkaURL: kafka:29092
       topic: "ab-test-stats"
       groupID: "proxy_stats_consumer"
       postgresURL: postgresql://abtest:abtest@postgres:5432/abtest?sslmode=disable
-    build:
-      context: .
-      dockerfile: stat-consumer/Dockerfile
     depends_on:
       kafka:
         condition: service_healthy
