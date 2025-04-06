@@ -26,10 +26,8 @@
     </div>
 
     <!-- Proxies List -->
-    <div class="mt-8 flow-root">
-      <ProxiesList :filteredProxies="filteredProxies" :sortBy="sortBy" :sortDesc="sortDesc" @sort="handleSort"
-                   @delete="deleteProxy" @edit="editProxy" @viewHistory="viewHistory"/>
-    </div>
+    <ProxiesList :filteredProxies="filteredProxies" :sortBy="sortBy" :sortDesc="sortDesc" @sort="handleSort"
+                 @delete="deleteProxy" @edit="editProxy" @viewHistory="viewHistory"/>
 
     <!-- Pagination -->
     <Pagination :currentPage="currentPage" :itemsPerPage="itemsPerPage" @changePage="changePage"
@@ -70,10 +68,14 @@ const editingProxy = ref(null)
 const selectedProxyId = ref(null)
 
 const form = ref({
+  name: '',
   listen_url: '',
   mode: 'reverse',
   tags: [],
   targets: [],
+  saving_cookies_flg: false,
+  query_forwarding_flg: true,
+  cookies_forwarding_flg: false,
   condition: {
     type: '',
     param_name: '',
@@ -98,19 +100,32 @@ async function loadProxies() {
         sortBy: sortBy.value,
         sortDesc: sortDesc.value
       }
-    })
-    proxies.value = response.data.items.map((proxy) => {
-      return {
-        ...proxy,
-        condition: {
-          ...proxy.condition,
-          values: proxy.condition?.values ? proxy.targets.map(({id}) => proxy.condition.values[id]) : []
-        }
+    });
+    
+    proxies.value = response.data.items.map(proxy => {
+      // Skip unnecessary object copying for expr condition type
+      if (proxy.condition?.type === 'expr') {
+        return proxy;
       }
-    })
-    totalProxies.value = response.data.total
+      
+      // Only transform non-expr conditions that have values
+      if (proxy.condition?.values) {
+        return {
+          ...proxy,
+          condition: {
+            ...proxy.condition,
+            values: proxy.targets.map(({id}) => proxy.condition.values[id] || '')
+          }
+        };
+      }
+      
+      // Return original proxy if no special handling needed
+      return proxy;
+    });
+    
+    totalProxies.value = response.data.total;
   } catch (error) {
-    console.error('Failed to load proxies:', error)
+    console.error('Failed to load proxies:', error);
   }
 }
 
@@ -147,10 +162,15 @@ async function filterProxies() {
 function openCreateModal() {
   editingProxy.value = null
   form.value = {
+    name: '',
     listen_url: '',
+    listen_urls: [''],
     mode: 'reverse',
     tags: [],
     targets: [],
+    saving_cookies_flg: false,
+    query_forwarding_flg: true,
+    cookies_forwarding_flg: false,
     condition: {
       type: '',
       param_name: '',
@@ -164,10 +184,19 @@ function openCreateModal() {
 function editProxy(proxy) {
   editingProxy.value = proxy
   form.value = {
+    name: proxy.name,
     listen_url: proxy.listen_url,
+    // Extract the listen_url property from each object in the listen_urls array
+    // or fall back to the single listen_url if listen_urls is not available
+    listen_urls: proxy.listen_urls ? proxy.listen_urls.map(url => url.listen_url) : [proxy.listen_url],
     mode: proxy.mode,
     tags: proxy.tags || [],
+    saving_cookies_flg: proxy.saving_cookies_flg,
+    query_forwarding_flg: proxy.query_forwarding_flg,
+    cookies_forwarding_flg: proxy.cookies_forwarding_flg,
     targets: proxy.targets.map(t => ({
+      id: t.id,
+      name: t.name || '',
       url: t.url,
       weight: t.weight * 100,
       is_active: t.is_active
@@ -186,10 +215,14 @@ function closeModal() {
   showModal.value = false
   editingProxy.value = null
   form.value = {
+    name: '',
     listen_url: '',
     mode: 'reverse',
     tags: [],
     targets: [],
+    saving_cookies_flg: false,
+    query_forwarding_flg: true,
+    cookies_forwarding_flg: false,
     condition: {
       type: '',
       param_name: '',
@@ -212,19 +245,74 @@ function closeHistoryModal() {
 async function handleSubmit(formData) {
   try {
     if (editingProxy.value) {
+      // Update URL/path key if they changed
+      if (formData.listen_url !== editingProxy.value.listen_url || 
+          formData.path_key !== editingProxy.value.path_key || 
+          JSON.stringify(formData.listen_urls) !== JSON.stringify(editingProxy.value.listen_urls || [editingProxy.value.listen_url])) {
+        await axios.put(`/api/proxies/${editingProxy.value.id}/url`, {
+          listen_url: formData.listen_url,
+          listen_urls: formData.listen_urls,
+          path_key: formData.path_key
+        });
+      }
+      
+      // Update saving_cookies_flg if it changed
+      if (formData.saving_cookies_flg !== editingProxy.value.saving_cookies_flg) {
+        await axios.put(`/api/proxies/${editingProxy.value.id}/cookies`, {
+          saving_cookies_flg: formData.saving_cookies_flg
+        });
+      }
+
+      // Update query_forwarding_flg if it changed
+      if (formData.query_forwarding_flg !== editingProxy.value.query_forwarding_flg) {
+        await axios.put(`/api/proxies/${editingProxy.value.id}/query-forwarding`, {
+          query_forwarding_flg: formData.query_forwarding_flg
+        });
+      }
+
+      // Update cookies_forwarding_flg if it changed
+      if (formData.cookies_forwarding_flg !== editingProxy.value.cookies_forwarding_flg) {
+        await axios.put(`/api/proxies/${editingProxy.value.id}/cookies-forwarding`, {
+          cookies_forwarding_flg: formData.cookies_forwarding_flg
+        });
+      }
+      
+      // Check if condition has changed
+      const conditionChanged = (
+        formData.condition.type !== editingProxy.value.condition.type ||
+        formData.condition.param_name !== editingProxy.value.condition.param_name ||
+        formData.condition.default !== editingProxy.value.condition.default ||
+        JSON.stringify(formData.condition.values) !== JSON.stringify(editingProxy.value.condition.values) ||
+        formData.condition.expr !== editingProxy.value.condition.expr
+      );
+      
+      // Update condition if it changed
+      if (conditionChanged) {
+        await axios.put(`/api/proxies/${editingProxy.value.id}/condition`, {
+          condition: {
+            type: formData.condition.type,
+            param_name: formData.condition.param_name,
+            values: formData.condition.values,
+            default: formData.condition.default,
+            expr: formData.condition.expr
+          }
+        });
+      }
+      
+      // Update targets and tags
       await Promise.all([
         axios.put(`/api/proxies/${editingProxy.value.id}/targets`, formData),
         axios.put(`/api/proxies/${editingProxy.value.id}/tags`, {tags: formData.tags})
-      ])
+      ]);
     } else {
-      await axios.post('/api/proxies', formData)
+      await axios.post('/api/proxies', formData);
     }
 
-    await loadProxies()
-    closeModal()
+    await loadProxies();
+    closeModal();
   } catch (error) {
-    console.error('Failed to save proxy:', error)
-    alert(error.response?.data?.error || 'Failed to save proxy')
+    console.error('Failed to save proxy:', error);
+    alert(error.response?.data?.error || 'Failed to save proxy');
   }
 }
 

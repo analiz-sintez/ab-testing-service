@@ -14,7 +14,7 @@ import (
 )
 
 // UpdateProxyWithTargetsAndCondition обновляет прокси, его таргеты и условия в одной транзакции
-func (s *Storage) UpdateProxyWithTargetsAndCondition(ctx context.Context, proxyID string,
+func (s *Storage) UpdateProxyWithTargetsAndCondition_(ctx context.Context, proxyID string,
 	currentProxy *models.Proxy, targets []models.Target,
 	condition *models.RouteCondition, userID *string) error {
 

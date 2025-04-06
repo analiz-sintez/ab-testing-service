@@ -11,154 +11,60 @@
               {{ proxy ? 'Edit Proxy' : 'Create New Proxy' }}
             </h3>
             <div class="mt-4 space-y-4">
+              <!-- Basic Information -->
               <div>
-                <label class="block text-sm font-medium text-gray-700">Listen URL</label>
+                <label for="name" class="block text-sm font-medium text-gray-700">Name</label>
                 <input
-                    v-model="form.listen_url"
                     type="text"
-                    class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                    required
+                    id="name"
+                    v-model="form.name"
+                    class="mt-1 p-2 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                    placeholder="Enter proxy name"
                 />
               </div>
+              
+              <TagsInput v-model="form.tags" />
+
+              <!-- Listen URLs Section -->
+              <ListenUrlsSection 
+                v-model="form.listen_urls" 
+                :errors="urlErrors"
+                @validate="validateListenUrl"
+                @add="addListenUrl"
+                @remove="removeListenUrl"
+              />
+              
+              <!-- Mode Selection -->
               <div>
                 <label class="block text-sm font-medium text-gray-700">Mode</label>
                 <select
                     v-model="form.mode"
-                    class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                    class="mt-1 block w-full p-2 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
                 >
                   <option value="path">Path</option>
                   <option value="redirect">Redirect</option>
-                  <option value="reverse">Reverse Proxy</option>
                 </select>
               </div>
 
-              <!-- Route Condition -->
-              <div>
-                <label class="block text-sm font-medium text-gray-700">Route Condition</label>
-                <div class="mt-2 space-y-4">
-                  <div>
-                    <select
-                        v-model="form.condition.type"
-                        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                    >
-                      <option value="">No condition</option>
-                      <option value="header">Header</option>
-                      <option value="query">Query Parameter</option>
-                      <option value="cookie">Cookie</option>
-                      <option value="user_agent">User Agent</option>
-                      <option value="language">Language</option>
-                    </select>
-                  </div>
+              <!-- Route Condition Section -->
+              <RouteConditionSection 
+                v-model="form.condition" 
+                :targets="form.targets" 
+              />
 
-                  <!-- Parameter Name -->
-                  <div v-if="form.condition.type && form.condition.type !== 'language'">
-                    <label class="block text-sm font-medium text-gray-700">
-                      {{ form.condition.type === 'user_agent' ? 'User Agent Parameter' : 'Parameter Name' }}
-                    </label>
-                    <select
-                        v-if="form.condition.type === 'user_agent'"
-                        v-model="form.condition.param_name"
-                        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                    >
-                      <option value="platform">Platform (Mobile/Desktop)</option>
-                      <option value="browser">Browser</option>
-                    </select>
-                    <input
-                        v-else
-                        v-model="form.condition.param_name"
-                        type="text"
-                        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                        :placeholder="getParamPlaceholder(form.condition.type)"
-                    />
-                  </div>
+              <!-- Settings Section -->
+              <SettingsSection 
+                v-model="settings" 
+              />
 
-                  <!-- Values -->
-                  <div v-if="form.condition.type">
-                    <label class="block text-sm font-medium text-gray-700">Values</label>
-                    <div class="mt-2 space-y-2">
-                      <div
-                          v-for="(target, index) in form.targets"
-                          :key="target.id"
-                          class="flex items-center gap-2"
-                      >
-                        <input
-                            v-model="form.condition.values[index]"
-                            type="text"
-                            class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                            :placeholder="getValuePlaceholder(form.condition.type, form.condition.param_name)"
-                        />
-                        <span class="text-sm text-gray-500">→</span>
-                        <span class="text-sm text-gray-700">{{ target.url }}</span>
-                      </div>
-                    </div>
-                    <p class="mt-1 text-sm text-gray-500">
-                      {{ getConditionHelp(form.condition.type, form.condition.param_name) }}
-                    </p>
-                  </div>
-
-                  <!-- Default Target -->
-                  <div v-if="form.condition.type">
-                    <label class="block text-sm font-medium text-gray-700">Default Target</label>
-                    <select
-                        v-model="form.condition.default"
-                        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                    >
-                      <option
-                          v-for="target in form.targets"
-                          :key="target.id"
-                          :value="target.id"
-                      >
-                        {{ target.url }}
-                      </option>
-                    </select>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Tags and Targets -->
-              <div>
-                <TagsInput
-                    v-model="form.tags"
-                    :available-tags="availableTags"
-                />
-              </div>
-              <div>
-                <label class="block text-sm font-medium text-gray-700">Targets</label>
-                <div v-for="(target, index) in form.targets" :key="index" class="mt-2 flex items-center gap-2">
-                  <input
-                      v-model="target.url"
-                      type="text"
-                      required
-                      placeholder="Target URL with optional query"
-                      pattern="^(https?:\/\/)?([\da-z.\-]+\.)*[\da-z.\-]+\.([a-z.]{2,6})(\/[\w.\-]*)*(\?[\w.%\-]+(=[\w.%\-]*)?(&[\w.%\-]+(=[\w.%\-]*)?)*)?(#[\w%\-]*)?$"
-                      class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                  />
-                  <input
-                      v-model.number="target.weight"
-                      type="number"
-                      min="0"
-                      max="100"
-                      placeholder="Weight"
-                      class="block w-20 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                  />
-                  <button
-                      type="button"
-                      @click="removeTarget(index)"
-                      class="text-red-600 hover:text-red-900"
-                  >
-                    Remove
-                  </button>
-                </div>
-                <button
-                    type="button"
-                    @click="addTarget"
-                    class="mt-2 text-sm text-indigo-600 hover:text-indigo-900"
-                >
-                  Add Target
-                </button>
-              </div>
+              <!-- Targets Section -->
+              <TargetsSection 
+                v-model="form.targets" 
+              />
             </div>
           </div>
+          
+          <!-- Form Buttons -->
           <div class="mt-5 sm:mt-6 sm:grid sm:grid-flow-row-dense sm:grid-cols-2 sm:gap-3">
             <button
                 type="submit"
@@ -179,32 +85,45 @@
     </div>
   </div>
 </template>
+
 <script setup lang="ts">
 import TagsInput from "@/components/TagsInput.vue";
-import {ref} from "vue";
+import ListenUrlsSection from "@/components/modals/ListenUrlsSection.vue";
+import TargetsSection from "@/components/modals/TargetsSection.vue";
+import RouteConditionSection from "@/components/modals/RouteConditionSection.vue";
+import SettingsSection from "@/components/modals/SettingsSection.vue";
+import {ref, nextTick, computed} from "vue";
 
 type Target = {
   id?: string;
+  name?: string;
   url: string;
   weight: number;
   is_active?: boolean
 }
 
 type Form = {
-  listen_url: string;
+  name: string;
+  listen_url: string; // Keeping for backward compatibility
+  listen_urls: string[];
   mode: string;
   tags: string[];
   targets: Target[];
+  saving_cookies_flg: boolean;
+  query_forwarding_flg: boolean;
+  cookies_forwarding_flg: boolean;
   condition: {
     type: string;
-    param_name: string;
-    values: string[];
-    default: string;
-  };
-};
+    param_name?: string;
+    values: Record<string, string>;
+    expressions?: Array<{ expr: string; target: string }>;
+    default?: string;
+    expr?: string;
+  }
+}
 
-type Proxy = Form & {
-  id: string
+type Proxy = {
+  id: string;
 }
 
 const props = defineProps<{
@@ -220,75 +139,154 @@ const closeModal = () => {
 }
 
 const form = ref(props.form)
+const urlErrors = ref({})
+
+// Create a computed property for the settings section that syncs with form
+const settings = computed({
+  get: () => ({
+    saving_cookies_flg: form.value.saving_cookies_flg,
+    query_forwarding_flg: form.value.query_forwarding_flg,
+    cookies_forwarding_flg: form.value.cookies_forwarding_flg
+  }),
+  set: (val) => {
+    form.value.saving_cookies_flg = val.saving_cookies_flg
+    form.value.query_forwarding_flg = val.query_forwarding_flg
+    form.value.cookies_forwarding_flg = val.cookies_forwarding_flg
+  }
+})
+
+// Initialize listen_urls if it doesn't exist
+if (!form.value.listen_urls) {
+  form.value.listen_urls = form.value.listen_url ? [form.value.listen_url] : []
+}
+
+// Ensure there's at least one listen URL
+if (form.value.listen_urls.length === 0) {
+  form.value.listen_urls.push('')
+}
+
+const validateAllListenUrls = () => {
+  // Clear all previous errors
+  urlErrors.value = {}
+  
+  // Validate each URL
+  let isValid = true
+  form.value.listen_urls.forEach((url, index) => {
+    // Check if URL is empty
+    if (!url || url.trim() === '') {
+      urlErrors.value[index] = 'Listen URL cannot be empty'
+      isValid = false
+      return
+    }
+    
+    // Basic URL format validation
+    const urlPattern = /^(localhost|(\d{1,3}\.){3}\d{1,3}|([a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?)*))(:([0-9]{1,5}))?(\/.*)?$/
+    if (!urlPattern.test(url)) {
+      urlErrors.value[index] = 'Please enter a valid URL format'
+      isValid = false
+      return
+    }
+    
+    // Check for duplicate URLs
+    const duplicateIndex = form.value.listen_urls.findIndex((u, i) => u === url && i !== index)
+    if (duplicateIndex !== -1) {
+      urlErrors.value[index] = 'This URL is already in the list'
+      isValid = false
+    }
+  })
+  
+  return isValid
+}
 
 const handleSubmit = () => {
+  // Validate all listen URLs before submission
+  if (!validateAllListenUrls()) {
+    // Scroll to the first error
+    nextTick(() => {
+      const errorElement = document.querySelector('.text-red-600')
+      if (errorElement) {
+        errorElement.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      }
+    })
+    return
+  }
   const formData = {
-    listen_url: form.value.listen_url,
+    name: form.value.name,
+    listen_url: form.value.listen_urls[0] || '', // For backward compatibility
+    listen_urls: form.value.listen_urls,
     mode: form.value.mode,
     tags: form.value.tags,
+    targets: form.value.targets.map(target => ({
+      ...target,
+      weight: target.weight / 100
+    })),
     condition: form.value.condition,
-    targets: form.value.targets.map(t => ({
-      url: t.url,
-      weight: t.weight / 100,
-      is_active: t.is_active ?? true
-    }))
+    saving_cookies_flg: form.value.saving_cookies_flg,
+    query_forwarding_flg: form.value.query_forwarding_flg,
+    cookies_forwarding_flg: form.value.cookies_forwarding_flg
   }
+
   emit('submit', formData)
 }
 
-function addTarget() {
-  form.value.targets.push({
-    url: '',
-    weight: 50,
-    is_active: true
+function addListenUrl() {
+  if (!form.value.listen_urls) {
+    form.value.listen_urls = []
+  }
+  // Add a new empty URL to the list
+  const newIndex = form.value.listen_urls.length
+  form.value.listen_urls.push('')
+  
+  // Focus on the newly added input field after the DOM updates
+  nextTick(() => {
+    const inputs = document.querySelectorAll('input[placeholder="Enter listen URL (e.g., localhost:8080)"]')
+    if (inputs && inputs[newIndex]) {
+      // Cast to HTMLInputElement to access focus method
+      (inputs[newIndex] as HTMLInputElement).focus()
+    }
   })
 }
 
-function removeTarget(index) {
-  form.value.targets.splice(index, 1)
+function removeListenUrl(index) {
+  form.value.listen_urls.splice(index, 1)
+  // Clear any errors for this index
+  delete urlErrors.value[index]
+  // Reindex the errors object after removal
+  const newErrors = {}
+  Object.keys(urlErrors.value).forEach(key => {
+    const numKey = parseInt(key)
+    if (numKey > index) {
+      newErrors[numKey - 1] = urlErrors.value[key]
+    } else if (numKey < index) {
+      newErrors[numKey] = urlErrors.value[key]
+    }
+  })
+  urlErrors.value = newErrors
 }
 
-function getParamPlaceholder(type) {
-  switch (type) {
-    case 'header':
-      return 'X-Custom-Header'
-    case 'query':
-      return 'version'
-    case 'cookie':
-      return 'user_preference'
-    default:
-      return ''
+function validateListenUrl(index) {
+  const url = form.value.listen_urls[index]
+  
+  // Clear previous error for this index
+  delete urlErrors.value[index]
+  
+  // Skip validation if empty (we'll handle this during form submission)
+  if (!url || url.trim() === '') {
+    return
   }
-}
-
-function getValuePlaceholder(type, param) {
-  switch (type) {
-    case 'user_agent':
-      return param === 'platform' ? 'mobile/desktop' : 'chrome/firefox/safari/edge/ie'
-    case 'language':
-      return 'en/es/fr/de'
-    default:
-      return 'Value for target'
+  
+  // Basic URL format validation
+  // Allow localhost, IP addresses, and domain names with optional port
+  const urlPattern = /^(localhost|((\d{1,3}\.){3}\d{1,3})|([a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?)*))(:([0-9]{1,5}))?(\/.*)?$/
+  
+  if (!urlPattern.test(url)) {
+    urlErrors.value[index] = 'Please enter a valid URL format'
   }
-}
-
-function getConditionHelp(type, param) {
-  switch (type) {
-    case 'user_agent':
-      if (param === 'platform') {
-        return 'Route traffic based on device type: mobile or desktop'
-      }
-      return 'Route traffic based on browser type: chrome, firefox, safari, edge, ie, or other'
-    case 'language':
-      return 'Route traffic based on preferred language from Accept-Language header (e.g., en, es, fr)'
-    case 'header':
-      return 'Route traffic based on a custom HTTP header value'
-    case 'query':
-      return 'Route traffic based on a URL query parameter value'
-    case 'cookie':
-      return 'Route traffic based on a cookie value'
-    default:
-      return ''
+  
+  // Check for duplicate URLs
+  const duplicateIndex = form.value.listen_urls.findIndex((u, i) => u === url && i !== index)
+  if (duplicateIndex !== -1) {
+    urlErrors.value[index] = 'This URL is already in the list'
   }
 }
 </script>

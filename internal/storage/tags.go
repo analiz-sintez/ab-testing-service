@@ -49,18 +49,40 @@ func (s *Storage) GetProxiesByTags(ctx context.Context, tags []string) ([]*model
 			}
 		}
 
-		proxy := models.Proxy{
-			ID:        item.ID,
-			ListenURL: item.ListenUrl,
-			Mode:      models.ProxyMode(item.Mode),
-			Condition: conditionJSON,
-			Tags:      item.Tags,
-			PathKey:   item.PathKey,
-			CreatedAt: item.CreatedAt.Time,
-			UpdatedAt: item.UpdatedAt.Time,
+		// Create proxy with basic info
+		proxy := &models.Proxy{
+			ID:               item.ID,
+			Mode:             models.ProxyMode(item.Mode),
+			Condition:        conditionJSON,
+			Tags:             item.Tags,
+			SavingCookiesFlg: item.SavingCookiesFlg,
+			CreatedAt:        item.CreatedAt.Time,
+			UpdatedAt:        item.UpdatedAt.Time,
 		}
 
-		proxies = append(proxies, &proxy)
+		// Set name if provided
+		if item.Name != nil {
+			proxy.Name = *item.Name
+		}
+
+		// Fetch listen URLs for this proxy
+		listenURLRows, err := s.q.GetProxyListenURLs(ctx, item.ID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get listen URLs for proxy %s: %w", item.ID, err)
+		}
+
+		// Add listen URLs to proxy
+		proxy.ListenURLs = make([]models.ListenURL, len(listenURLRows))
+		for i, urlRow := range listenURLRows {
+			proxy.ListenURLs[i] = models.ListenURL{
+				ID:        urlRow.ID,
+				ProxyID:   urlRow.ProxyID,
+				ListenURL: urlRow.ListenUrl,
+				PathKey:   urlRow.PathKey,
+			}
+		}
+
+		proxies = append(proxies, proxy)
 	}
 
 	return proxies, nil

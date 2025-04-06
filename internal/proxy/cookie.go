@@ -22,6 +22,11 @@ func (p *Proxy) getTargetFromCookie(r *http.Request) *Target {
 }
 
 func (p *Proxy) setCookies(w http.ResponseWriter, info *RedirectInfo) {
+	// Only set cookies if saving_cookies_flg is true
+	if !p.SavingCookiesFlg {
+		return
+	}
+
 	// Set ab_target cookie
 	http.SetCookie(w, &http.Cookie{
 		Name:     "ab_target_",

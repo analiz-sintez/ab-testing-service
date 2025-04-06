@@ -44,12 +44,6 @@ func (vh *VirtualHostHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 }
 
 func (s *Supervisor) CreateProxy(cfg proxy.Config) error {
-	// Extract hostname from ListenURL
-	host := strings.Split(cfg.ListenURL, ":")[0]
-	if host == "" {
-		return fmt.Errorf("invalid listen URL: %s", cfg.ListenURL)
-	}
-
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
@@ -71,24 +65,25 @@ func (s *Supervisor) CreateProxy(cfg proxy.Config) error {
 	}
 	s.proxies[cfg.ID] = instance
 
-	// Handle path-based routing
-	if cfg.PathKey != "" {
-		if _, exists := s.virtualHandler.pathProxies[cfg.PathKey]; exists {
-			return fmt.Errorf("proxy with path key %s already exists", cfg.PathKey)
+	// Handle each listen URL
+	for _, listenURL := range cfg.ListenURLs {
+		if listenURL.PathKey != nil {
+			// Handle path-based routing
+			if _, exists := s.virtualHandler.pathProxies[*listenURL.PathKey]; exists {
+				return fmt.Errorf("proxy with path key %s already exists", *listenURL.PathKey)
+			}
+			s.virtualHandler.pathProxies[*listenURL.PathKey] = p
+		} else {
+			// Handle host-based routing
+			host := strings.Split(listenURL.ListenURL, ":")[0]
+			if host == "" {
+				return fmt.Errorf("invalid listen URL: %s", listenURL.ListenURL)
+			}
+			if _, exists := s.virtualHandler.proxies[host]; exists {
+				return fmt.Errorf("proxy with host %s already exists", host)
+			}
+			s.virtualHandler.proxies[host] = p
 		}
-	}
-
-	// Handle host-based routing
-	if _, exists := s.virtualHandler.proxies[host]; exists {
-		return fmt.Errorf("proxy with host %s already exists", host)
-	}
-
-	if cfg.PathKey != "" {
-		log.Printf("path key: %s\n", cfg.PathKey)
-		s.virtualHandler.pathProxies[cfg.PathKey] = p
-	} else {
-		log.Printf("host: %s\n", host)
-		s.virtualHandler.proxies[host] = p
 	}
 
 	instance.Started = true

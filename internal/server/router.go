@@ -41,10 +41,14 @@ func (s *Server) setupRouter() {
 		api.GET("/proxies", s.listProxies)
 		api.POST("/proxies", s.createProxy)
 		api.GET("/proxies/:id", s.getProxy)
-		api.GET("/proxies/:id/history", s.getProxyChanges)
 		api.DELETE("/proxies/:id", s.deleteProxy)
-		api.PUT("/proxies/:id/targets", s.updateProxyTargets)
+		api.GET("/proxies/:id/history", s.getProxyChanges)
 		api.GET("/proxies/:id/changes", s.getProxyChanges)
+		api.PUT("/proxies/:id/targets", s.updateProxyTargets)
+		api.PUT("/proxies/:id/url", s.updateProxyURL)
+		api.PUT("/proxies/:id/cookies", s.updateProxySavingCookies)
+		api.PUT("/proxies/:id/query-forwarding", s.updateProxyQueryForwarding)
+		api.PUT("/proxies/:id/cookies-forwarding", s.updateProxyCookiesForwarding)
 
 		// Tag management
 		api.GET("/tags", s.getAllTags)

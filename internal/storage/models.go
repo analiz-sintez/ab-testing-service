@@ -18,6 +18,15 @@ type ProxyChange struct {
 	CreatedBy     *string
 }
 
+type ProxyListenUrl struct {
+	ID        string
+	ProxyID   string
+	ListenUrl string
+	PathKey   *string
+	CreatedAt pgtype.Timestamptz
+	UpdatedAt pgtype.Timestamptz
+}
+
 type User struct {
 	ID           string
 	Email        string

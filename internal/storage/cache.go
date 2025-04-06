@@ -84,14 +84,31 @@ func (s *Storage) GetProxy(ctx context.Context, id string) (*models.Proxy, error
 
 	proxyModel := models.Proxy{
 		ID:        p.ID,
-		ListenURL: p.ListenUrl,
 		Mode:      models.ProxyMode(p.Mode),
 		Condition: &conditionJSON,
-		PathKey:   p.PathKey,
+		Tags:      p.Tags,
 		CreatedAt: p.CreatedAt.Time,
 		UpdatedAt: p.UpdatedAt.Time,
 	}
 
+	// Get listen URLs
+	listenURLs, err := s.q.GetProxyListenURLs(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get listen URLs: %w", err)
+	}
+
+	for _, url := range listenURLs {
+		proxyModel.ListenURLs = append(proxyModel.ListenURLs, models.ListenURL{
+			ID:        url.ID,
+			ProxyID:   url.ProxyID,
+			ListenURL: url.ListenUrl,
+			PathKey:   url.PathKey,
+			CreatedAt: url.CreatedAt.Time,
+			UpdatedAt: url.UpdatedAt.Time,
+		})
+	}
+
+	// Get targets
 	targets, err := s.q.GetTargetsByProxyID(ctx, id)
 	if err != nil {
 		return nil, err

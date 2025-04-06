@@ -8,8 +8,11 @@ import (
 type ChangeType string
 
 const (
-	ChangeTypeTargetsUpdate   ChangeType = "targets_update"
-	ChangeTypeConditionUpdate ChangeType = "condition_update"
+	ChangeTypeTargetsUpdate         ChangeType = "targets_update"
+	ChangeTypeConditionUpdate       ChangeType = "condition_update"
+	ChangeTypeURLUpdate             ChangeType = "url_update"
+	ChangeTypeCookiesUpdate         ChangeType = "cookies_update"
+	ChangeTypeQueryForwardingUpdate ChangeType = "query_forwarding_update"
 )
 
 type ProxyChange struct {

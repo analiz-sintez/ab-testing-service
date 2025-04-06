@@ -12,29 +12,33 @@ import (
 )
 
 const createProxy = `-- name: CreateProxy :exec
-INSERT INTO proxies (id, listen_url, mode, path_key, condition, tags, created_at, updated_at)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+INSERT INTO proxies (id, name, mode, condition, tags, saving_cookies_flg, query_forwarding_flg, cookies_forwarding_flg, created_at, updated_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 `
 
 type CreateProxyParams struct {
-	ID        string
-	ListenUrl string
-	Mode      string
-	PathKey   *string
-	Condition []byte
-	Tags      []string
-	CreatedAt pgtype.Timestamptz
-	UpdatedAt pgtype.Timestamptz
+	ID                   string
+	Name                 *string
+	Mode                 string
+	Condition            []byte
+	Tags                 []string
+	SavingCookiesFlg     bool
+	QueryForwardingFlg   bool
+	CookiesForwardingFlg bool
+	CreatedAt            pgtype.Timestamptz
+	UpdatedAt            pgtype.Timestamptz
 }
 
 func (q *Queries) CreateProxy(ctx context.Context, arg *CreateProxyParams) error {
 	_, err := q.db.Exec(ctx, createProxy,
 		arg.ID,
-		arg.ListenUrl,
+		arg.Name,
 		arg.Mode,
-		arg.PathKey,
 		arg.Condition,
 		arg.Tags,
+		arg.SavingCookiesFlg,
+		arg.QueryForwardingFlg,
+		arg.CookiesForwardingFlg,
 		arg.CreatedAt,
 		arg.UpdatedAt,
 	)
@@ -65,6 +69,32 @@ func (q *Queries) CreateProxyChange(ctx context.Context, arg *CreateProxyChangeP
 		arg.NewState,
 		arg.CreatedAt,
 		arg.CreatedBy,
+	)
+	return err
+}
+
+const createProxyListenURL = `-- name: CreateProxyListenURL :exec
+INSERT INTO proxy_listen_urls (id, proxy_id, listen_url, path_key, created_at, updated_at)
+VALUES ($1, $2, $3, $4, $5, $6)
+`
+
+type CreateProxyListenURLParams struct {
+	ID        string
+	ProxyID   string
+	ListenUrl string
+	PathKey   *string
+	CreatedAt pgtype.Timestamptz
+	UpdatedAt pgtype.Timestamptz
+}
+
+func (q *Queries) CreateProxyListenURL(ctx context.Context, arg *CreateProxyListenURLParams) error {
+	_, err := q.db.Exec(ctx, createProxyListenURL,
+		arg.ID,
+		arg.ProxyID,
+		arg.ListenUrl,
+		arg.PathKey,
+		arg.CreatedAt,
+		arg.UpdatedAt,
 	)
 	return err
 }
@@ -147,6 +177,16 @@ func (q *Queries) CreateVisit(ctx context.Context, arg *CreateVisitParams) error
 	return err
 }
 
+const deleteProxyListenURL = `-- name: DeleteProxyListenURL :exec
+DELETE FROM proxy_listen_urls
+WHERE id = $1
+`
+
+func (q *Queries) DeleteProxyListenURL(ctx context.Context, id string) error {
+	_, err := q.db.Exec(ctx, deleteProxyListenURL, id)
+	return err
+}
+
 const deleteTargetByProxyID = `-- name: DeleteTargetByProxyID :exec
 DELETE
 FROM targets
@@ -186,18 +226,20 @@ func (q *Queries) GetAllTags(ctx context.Context) ([]string, error) {
 }
 
 const getProxies = `-- name: GetProxies :many
-SELECT id, listen_url, mode, condition, tags, path_key
-FROM proxies
-ORDER BY created_at DESC
+SELECT p.id, p.name, p.mode, p.condition, p.tags, p.saving_cookies_flg, p.query_forwarding_flg, p.cookies_forwarding_flg
+FROM proxies p
+ORDER BY p.created_at DESC
 `
 
 type GetProxiesRow struct {
-	ID        string
-	ListenUrl string
-	Mode      string
-	Condition []byte
-	Tags      []string
-	PathKey   *string
+	ID                   string
+	Name                 *string
+	Mode                 string
+	Condition            []byte
+	Tags                 []string
+	SavingCookiesFlg     bool
+	QueryForwardingFlg   bool
+	CookiesForwardingFlg bool
 }
 
 func (q *Queries) GetProxies(ctx context.Context) ([]*GetProxiesRow, error) {
@@ -211,11 +253,13 @@ func (q *Queries) GetProxies(ctx context.Context) ([]*GetProxiesRow, error) {
 		var i GetProxiesRow
 		if err := rows.Scan(
 			&i.ID,
-			&i.ListenUrl,
+			&i.Name,
 			&i.Mode,
 			&i.Condition,
 			&i.Tags,
-			&i.PathKey,
+			&i.SavingCookiesFlg,
+			&i.QueryForwardingFlg,
+			&i.CookiesForwardingFlg,
 		); err != nil {
 			return nil, err
 		}
@@ -229,11 +273,11 @@ func (q *Queries) GetProxies(ctx context.Context) ([]*GetProxiesRow, error) {
 
 const getProxiesByTags = `-- name: GetProxiesByTags :many
 SELECT DISTINCT p.id,
-                p.listen_url,
+                p.name,
                 p.mode,
                 p.condition,
                 p.tags,
-                p.path_key,
+                p.saving_cookies_flg,
                 p.created_at,
                 p.updated_at
 FROM proxies p
@@ -242,14 +286,14 @@ ORDER BY p.created_at DESC
 `
 
 type GetProxiesByTagsRow struct {
-	ID        string
-	ListenUrl string
-	Mode      string
-	Condition []byte
-	Tags      []string
-	PathKey   *string
-	CreatedAt pgtype.Timestamptz
-	UpdatedAt pgtype.Timestamptz
+	ID               string
+	Name             *string
+	Mode             string
+	Condition        []byte
+	Tags             []string
+	SavingCookiesFlg bool
+	CreatedAt        pgtype.Timestamptz
+	UpdatedAt        pgtype.Timestamptz
 }
 
 func (q *Queries) GetProxiesByTags(ctx context.Context, tags []string) ([]*GetProxiesByTagsRow, error) {
@@ -263,11 +307,11 @@ func (q *Queries) GetProxiesByTags(ctx context.Context, tags []string) ([]*GetPr
 		var i GetProxiesByTagsRow
 		if err := rows.Scan(
 			&i.ID,
-			&i.ListenUrl,
+			&i.Name,
 			&i.Mode,
 			&i.Condition,
 			&i.Tags,
-			&i.PathKey,
+			&i.SavingCookiesFlg,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 		); err != nil {
@@ -282,19 +326,22 @@ func (q *Queries) GetProxiesByTags(ctx context.Context, tags []string) ([]*GetPr
 }
 
 const getProxy = `-- name: GetProxy :one
-SELECT id, listen_url, mode, condition, path_key, created_at, updated_at
-FROM proxies
-WHERE id = $1
+SELECT p.id, p.name, p.mode, p.condition, p.tags, p.saving_cookies_flg, p.query_forwarding_flg, p.cookies_forwarding_flg, p.created_at, p.updated_at
+FROM proxies p
+WHERE p.id = $1
 `
 
 type GetProxyRow struct {
-	ID        string
-	ListenUrl string
-	Mode      string
-	Condition []byte
-	PathKey   *string
-	CreatedAt pgtype.Timestamptz
-	UpdatedAt pgtype.Timestamptz
+	ID                   string
+	Name                 *string
+	Mode                 string
+	Condition            []byte
+	Tags                 []string
+	SavingCookiesFlg     bool
+	QueryForwardingFlg   bool
+	CookiesForwardingFlg bool
+	CreatedAt            pgtype.Timestamptz
+	UpdatedAt            pgtype.Timestamptz
 }
 
 func (q *Queries) GetProxy(ctx context.Context, id string) (*GetProxyRow, error) {
@@ -302,10 +349,13 @@ func (q *Queries) GetProxy(ctx context.Context, id string) (*GetProxyRow, error)
 	var i GetProxyRow
 	err := row.Scan(
 		&i.ID,
-		&i.ListenUrl,
+		&i.Name,
 		&i.Mode,
 		&i.Condition,
-		&i.PathKey,
+		&i.Tags,
+		&i.SavingCookiesFlg,
+		&i.QueryForwardingFlg,
+		&i.CookiesForwardingFlg,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -343,6 +393,39 @@ func (q *Queries) GetProxyChangesByProxyID(ctx context.Context, arg *GetProxyCha
 			&i.NewState,
 			&i.CreatedAt,
 			&i.CreatedBy,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getProxyListenURLs = `-- name: GetProxyListenURLs :many
+SELECT id, proxy_id, listen_url, path_key, created_at, updated_at
+FROM proxy_listen_urls
+WHERE proxy_id = $1
+`
+
+func (q *Queries) GetProxyListenURLs(ctx context.Context, proxyID string) ([]*ProxyListenUrl, error) {
+	rows, err := q.db.Query(ctx, getProxyListenURLs, proxyID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*ProxyListenUrl
+	for rows.Next() {
+		var i ProxyListenUrl
+		if err := rows.Scan(
+			&i.ID,
+			&i.ProxyID,
+			&i.ListenUrl,
+			&i.PathKey,
+			&i.CreatedAt,
+			&i.UpdatedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -524,18 +607,87 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (*User, erro
 const updateProxyCondition = `-- name: UpdateProxyCondition :exec
 UPDATE proxies
 SET condition  = $1,
-    updated_at = $2
-WHERE id = $3
+    updated_at = NOW()
+WHERE id = $2
 `
 
 type UpdateProxyConditionParams struct {
 	Condition []byte
-	UpdatedAt pgtype.Timestamptz
 	ID        string
 }
 
 func (q *Queries) UpdateProxyCondition(ctx context.Context, arg *UpdateProxyConditionParams) error {
-	_, err := q.db.Exec(ctx, updateProxyCondition, arg.Condition, arg.UpdatedAt, arg.ID)
+	_, err := q.db.Exec(ctx, updateProxyCondition, arg.Condition, arg.ID)
+	return err
+}
+
+const updateProxyCookiesForwarding = `-- name: UpdateProxyCookiesForwarding :exec
+UPDATE proxies
+SET cookies_forwarding_flg = $1,
+    updated_at = NOW()
+WHERE id = $2
+`
+
+type UpdateProxyCookiesForwardingParams struct {
+	CookiesForwardingFlg bool
+	ID                   string
+}
+
+func (q *Queries) UpdateProxyCookiesForwarding(ctx context.Context, arg *UpdateProxyCookiesForwardingParams) error {
+	_, err := q.db.Exec(ctx, updateProxyCookiesForwarding, arg.CookiesForwardingFlg, arg.ID)
+	return err
+}
+
+const updateProxyListenURL = `-- name: UpdateProxyListenURL :exec
+UPDATE proxy_listen_urls
+SET listen_url = $1,
+    path_key = $2,
+    updated_at = NOW()
+WHERE id = $3
+`
+
+type UpdateProxyListenURLParams struct {
+	ListenUrl string
+	PathKey   *string
+	ID        string
+}
+
+func (q *Queries) UpdateProxyListenURL(ctx context.Context, arg *UpdateProxyListenURLParams) error {
+	_, err := q.db.Exec(ctx, updateProxyListenURL, arg.ListenUrl, arg.PathKey, arg.ID)
+	return err
+}
+
+const updateProxyQueryForwarding = `-- name: UpdateProxyQueryForwarding :exec
+UPDATE proxies
+SET query_forwarding_flg = $1,
+    updated_at = NOW()
+WHERE id = $2
+`
+
+type UpdateProxyQueryForwardingParams struct {
+	QueryForwardingFlg bool
+	ID                 string
+}
+
+func (q *Queries) UpdateProxyQueryForwarding(ctx context.Context, arg *UpdateProxyQueryForwardingParams) error {
+	_, err := q.db.Exec(ctx, updateProxyQueryForwarding, arg.QueryForwardingFlg, arg.ID)
+	return err
+}
+
+const updateProxySavingCookies = `-- name: UpdateProxySavingCookies :exec
+UPDATE proxies
+SET saving_cookies_flg = $1,
+    updated_at = NOW()
+WHERE id = $2
+`
+
+type UpdateProxySavingCookiesParams struct {
+	SavingCookiesFlg bool
+	ID               string
+}
+
+func (q *Queries) UpdateProxySavingCookies(ctx context.Context, arg *UpdateProxySavingCookiesParams) error {
+	_, err := q.db.Exec(ctx, updateProxySavingCookies, arg.SavingCookiesFlg, arg.ID)
 	return err
 }
 
