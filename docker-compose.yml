@@ -4,7 +4,7 @@ services:
     # build:
     #   context: .
     #   dockerfile: Dockerfile.backend
-    image: ghcr.io/analiz-sintez/ab-testing-service-backend:v0.0.01@sha256:0cfe2089275dfa7f9131168db2d0b08a06179bf09bcbb56e1a98ddd5c622c61c
+    image: ghcr.io/analiz-sintez/ab-testing-service-backend:${BACKEND_TAG:-latest}
     ports:
       - "${BACKEND_PORT:-8080}:8080"
       - "${SERVICE_PORT:-8081}:80"
@@ -24,7 +24,7 @@ services:
     # build:
     #   context: ./web
     #   dockerfile: ../Dockerfile.frontend
-    image: ghcr.io/analiz-sintez/ab-testing-service-frontend:v0.0.01@sha256:76101c5c2e38103c5862b4b05c093f978d812f7c36dad460c4472288a0d061ec
+    image: ghcr.io/analiz-sintez/ab-testing-service-frontend:${FRONTEND_TAG:-latest}
     ports:
       - "${FRONTEND_PORT:-8000}:80"
     depends_on:
@@ -39,7 +39,7 @@ services:
     # build:
     #   context: .
     #   dockerfile: Dockerfile.migrator
-    image: ghcr.io/analiz-sintez/ab-testing-service-migrator:v0.0.01@sha256:568cee6f9edca3f3c8629cb71774d9ac4b4bcaeb5e8f08757b0c7ec4cd72bc09
+    image: ghcr.io/analiz-sintez/ab-testing-service-migrator:${MIGRATOR_TAG:-latest}
     depends_on:
       postgres:
         condition: service_healthy
