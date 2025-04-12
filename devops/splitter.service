@@ -11,16 +11,16 @@ WorkingDirectory=/home/spl/ab-testing-service
 User=spl
 
 ExecStartPre=/home/spl/ab-testing-service/devops/update-tags.sh
-ExecStart=/usr/local/bin/docker-compose up
+ExecStart=/usr/local/bin/docker-compose up -d
 ExecStop=/usr/local/bin/docker-compose down
 ExecReload=/home/spl/ab-testing-service/devops/update-tags.sh
-ExecReload=/usr/local/bin/docker-compose up
+ExecReload=/usr/local/bin/docker-compose up -d
 
 Restart=on-failure
 RestartSec=10s
 
 CPUQuota=90%
-MemoryLimit=1800M
+MemoryMax=1800M
 
 [Install]
 WantedBy=multi-user.target
