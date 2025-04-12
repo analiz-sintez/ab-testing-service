@@ -17,9 +17,11 @@ func (s *Supervisor) DeleteProxy(ctx context.Context, id string) error {
 	instance, exists := s.proxies[id]
 	if exists && instance.Proxy != nil {
 		// Remove from virtual host handler
-		host := strings.Split(instance.Proxy.Config.ListenURL, ":")[0]
-		if s.virtualHandler != nil {
-			delete(s.virtualHandler.proxies, host)
+		for _, item := range instance.Proxy.Config.ListenURLs {
+			host := strings.Split(item.ListenURL, ":")[0]
+			if s.virtualHandler != nil {
+				delete(s.virtualHandler.proxies, host)
+			}
 		}
 	}
 
@@ -40,11 +42,10 @@ func (s *Supervisor) handleProxyUpdate(ctx context.Context, proxyID string) erro
 		return fmt.Errorf("failed to get proxy config: %w", err)
 	}
 
-	// Update the proxy
-	return s.UpdateProxyTargets(ctx, cfg)
+	return s.UpdateProxy(ctx, cfg)
 }
 
-func (s *Supervisor) UpdateProxyTargets(ctx context.Context, cfg proxy.Config) error {
+func (s *Supervisor) UpdateProxy(ctx context.Context, cfg proxy.Config) error {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
@@ -54,11 +55,19 @@ func (s *Supervisor) UpdateProxyTargets(ctx context.Context, cfg proxy.Config) e
 	}
 
 	// Get old and new hosts
-	oldHost := ""
+	oldHosts := make(map[string]bool)
 	if instance.Proxy != nil {
-		oldHost = strings.Split(instance.Proxy.Config.ListenURL, ":")[0]
+		for _, lu := range instance.Proxy.Config.ListenURLs {
+			host := strings.Split(lu.ListenURL, ":")[0]
+			oldHosts[host] = true
+		}
 	}
-	newHost := strings.Split(cfg.ListenURL, ":")[0]
+
+	newHosts := make(map[string]bool)
+	for _, lu := range cfg.ListenURLs {
+		host := strings.Split(lu.ListenURL, ":")[0]
+		newHosts[host] = true
+	}
 
 	// Create new proxy with updated config
 	newProxy, err := proxy.NewProxy(cfg)
@@ -68,12 +77,18 @@ func (s *Supervisor) UpdateProxyTargets(ctx context.Context, cfg proxy.Config) e
 
 	// Update virtual host handler
 	if s.virtualHandler != nil {
-		// Remove old host if it changed
-		if oldHost != "" && oldHost != newHost {
-			delete(s.virtualHandler.proxies, oldHost)
+		// Removing old hosts that are not in the new config
+		for oldHost := range oldHosts {
+			if !newHosts[oldHost] {
+				delete(s.virtualHandler.proxies, oldHost)
+			}
 		}
-		// Add new host
-		s.virtualHandler.proxies[newHost] = newProxy
+
+		// Adding new hosts
+		for _, lu := range cfg.ListenURLs {
+			host := strings.Split(lu.ListenURL, ":")[0]
+			s.virtualHandler.proxies[host] = newProxy
+		}
 	}
 
 	// Update the instance

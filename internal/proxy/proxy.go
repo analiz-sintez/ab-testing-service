@@ -2,6 +2,8 @@ package proxy
 
 import (
 	"fmt"
+	"net/http"
+	"net/url"
 	"sync"
 
 	"github.com/ab-testing-service/internal/models"
@@ -15,13 +17,22 @@ type Target struct {
 }
 
 type Config struct {
-	ID        string           `json:"id"`
-	ListenURL string           `json:"listen_url"`
-	Mode      models.ProxyMode `json:"mode"`
-	PathKey   string           `json:"path_key,omitempty"`
-	Targets   []Target         `json:"targets"`
-	Condition *Condition       `json:"condition"`
-	Tags      []string         `json:"tags"`
+	ID                   string           `json:"id"`
+	Name                 string           `json:"name"`
+	ListenURLs           []ListenURL      `json:"listen_urls"`
+	Mode                 models.ProxyMode `json:"mode"`
+	Targets              []Target         `json:"targets"`
+	Condition            *Condition       `json:"condition"`
+	Tags                 []string         `json:"tags"`
+	SavingCookiesFlg     bool             `json:"saving_cookies_flg"`
+	QueryForwardingFlg   bool             `json:"query_forwarding_flg"`
+	CookiesForwardingFlg bool             `json:"cookies_forwarding_flg"`
+}
+
+type ListenURL struct {
+	ID        string  `json:"id"`
+	ListenURL string  `json:"listen_url"`
+	PathKey   *string `json:"path_key,omitempty"`
 }
 
 type Condition struct {
@@ -29,19 +40,31 @@ type Condition struct {
 	ParamName string               `json:"param_name"`
 	Values    map[string]string    `json:"values"`
 	Default   string               `json:"default"`
+	Expr      string               `json:"expr,omitempty"`
+}
+
+type RedirectInfo struct {
+	RID     string // Redirect ID (same for all users within proxy)
+	RRID    string // Redirect Request ID (unique per click)
+	RUID    string // Redirect User ID (unique per user)
+	Query   url.Values
+	Cookies []*http.Cookie
 }
 
 type Proxy struct {
-	ID         string
-	ListenURL  string
-	Mode       models.ProxyMode
-	PathKey    string
-	Targets    []Target
-	Config     Config
-	mutex      sync.RWMutex
-	metrics    *Metrics
-	cookieName string
-	stats      *Stats
+	ID                   string
+	Name                 string
+	ListenURLs           []ListenURL
+	Mode                 models.ProxyMode
+	Targets              []Target
+	Config               Config
+	SavingCookiesFlg     bool
+	QueryForwardingFlg   bool
+	CookiesForwardingFlg bool
+	mutex                sync.RWMutex
+	metrics              *Metrics
+	cookieName           string
+	stats                *Stats
 }
 
 func NewProxy(cfg Config) (*Proxy, error) {
@@ -58,14 +81,18 @@ func NewProxy(cfg Config) (*Proxy, error) {
 	}
 
 	proxy := &Proxy{
-		ID:         cfg.ID,
-		ListenURL:  cfg.ListenURL,
-		Mode:       cfg.Mode,
-		Targets:    cfg.Targets,
-		Config:     cfg,
-		metrics:    newProxyMetrics(cfg.ID),
-		cookieName: fmt.Sprintf("proxy_%s", cfg.ID),
-		stats:      NewProxyStats(cfg.ID),
+		ID:                   cfg.ID,
+		Name:                 cfg.Name,
+		ListenURLs:           cfg.ListenURLs,
+		Mode:                 cfg.Mode,
+		Targets:              cfg.Targets,
+		Config:               cfg,
+		SavingCookiesFlg:     cfg.SavingCookiesFlg,
+		QueryForwardingFlg:   cfg.QueryForwardingFlg,
+		CookiesForwardingFlg: cfg.CookiesForwardingFlg,
+		metrics:              newProxyMetrics(cfg.ID),
+		cookieName:           fmt.Sprintf("proxy_%s", cfg.ID),
+		stats:                NewProxyStats(cfg.ID),
 	}
 
 	return proxy, nil
@@ -75,8 +102,8 @@ func validate(cfg Config) (float64, error) {
 	if cfg.ID == "" {
 		return 0, fmt.Errorf("proxy ID is required")
 	}
-	if cfg.ListenURL == "" {
-		return 0, fmt.Errorf("listen URL is required")
+	if len(cfg.ListenURLs) == 0 {
+		return 0, fmt.Errorf("at least one listen URL is required")
 	}
 	if len(cfg.Targets) == 0 {
 		return 0, fmt.Errorf("at least one target is required")

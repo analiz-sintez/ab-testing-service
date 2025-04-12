@@ -11,24 +11,42 @@ INSERT INTO users (id, email, password_hash, created_at, updated_at)
 VALUES ($1, $2, $3, $4, $5);
 
 -- name: GetProxy :one
-SELECT id, listen_url, mode, condition, path_key, created_at, updated_at
-FROM proxies
-WHERE id = $1;
+SELECT p.id, p.name, p.mode, p.condition, p.tags, p.saving_cookies_flg, p.query_forwarding_flg, p.cookies_forwarding_flg, p.created_at, p.updated_at
+FROM proxies p
+WHERE p.id = $1;
 
 -- name: GetProxies :many
-SELECT id, listen_url, mode, condition, tags, path_key
-FROM proxies
-ORDER BY created_at DESC;
+SELECT p.id, p.name, p.mode, p.condition, p.tags, p.saving_cookies_flg, p.query_forwarding_flg, p.cookies_forwarding_flg
+FROM proxies p
+ORDER BY p.created_at DESC;
 
 -- name: UpdateProxyCondition :exec
 UPDATE proxies
 SET condition  = $1,
-    updated_at = $2
-WHERE id = $3;
+    updated_at = NOW()
+WHERE id = $2;
 
 -- name: UpdateProxyTags :exec
 UPDATE proxies
 SET tags       = $1,
+    updated_at = NOW()
+WHERE id = $2;
+
+-- name: UpdateProxySavingCookies :exec
+UPDATE proxies
+SET saving_cookies_flg = $1,
+    updated_at = NOW()
+WHERE id = $2;
+
+-- name: UpdateProxyQueryForwarding :exec
+UPDATE proxies
+SET query_forwarding_flg = $1,
+    updated_at = NOW()
+WHERE id = $2;
+
+-- name: UpdateProxyCookiesForwarding :exec
+UPDATE proxies
+SET cookies_forwarding_flg = $1,
     updated_at = NOW()
 WHERE id = $2;
 
@@ -45,11 +63,11 @@ WHERE id = $1;
 
 -- name: GetProxiesByTags :many
 SELECT DISTINCT p.id,
-                p.listen_url,
+                p.name,
                 p.mode,
                 p.condition,
                 p.tags,
-                p.path_key,
+                p.saving_cookies_flg,
                 p.created_at,
                 p.updated_at
 FROM proxies p
@@ -62,8 +80,8 @@ FROM targets
 WHERE proxy_id = $1;
 
 -- name: CreateProxy :exec
-INSERT INTO proxies (id, listen_url, mode, path_key, condition, tags, created_at, updated_at)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8);
+INSERT INTO proxies (id, name, mode, condition, tags, saving_cookies_flg, query_forwarding_flg, cookies_forwarding_flg, created_at, updated_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10);
 
 -- name: CreateTarget :exec
 INSERT INTO targets (id, proxy_id, url, weight, is_active)
@@ -113,3 +131,23 @@ FROM proxy_stats
 WHERE proxy_id = $1
   AND timestamp BETWEEN to_timestamp(@from_time::text, 'YYYY-MM-DD HH24:MI:SS.MS')
     AND to_timestamp(@to_time::text, 'YYYY-MM-DD HH24:MI:SS.MS');
+
+-- name: GetProxyListenURLs :many
+SELECT id, proxy_id, listen_url, path_key, created_at, updated_at
+FROM proxy_listen_urls
+WHERE proxy_id = $1;
+
+-- name: CreateProxyListenURL :exec
+INSERT INTO proxy_listen_urls (id, proxy_id, listen_url, path_key, created_at, updated_at)
+VALUES ($1, $2, $3, $4, $5, $6);
+
+-- name: UpdateProxyListenURL :exec
+UPDATE proxy_listen_urls
+SET listen_url = $1,
+    path_key = $2,
+    updated_at = NOW()
+WHERE id = $3;
+
+-- name: DeleteProxyListenURL :exec
+DELETE FROM proxy_listen_urls
+WHERE id = $1;

@@ -6,7 +6,7 @@
       </el-col>
       <el-col :span="12">
         <el-select v-model="selectedProxy" placeholder="Selected Proxy">
-          <el-option v-for="proxy in proxies" :key="proxy.id" :label="proxy.listen_url" :value="proxy.id"/>
+          <el-option v-for="proxy in proxies" :key="proxy.id" :label="proxy.name" :value="proxy.id"/>
         </el-select>
       </el-col>
     </el-row>

@@ -26,13 +26,13 @@ func (s *Supervisor) ListProxies(ctx context.Context, sortBy string, sortDesc bo
 			continue
 		}
 		configs = append(configs, proxy.Config{
-			ID:        id,
-			ListenURL: p.Proxy.ListenURL,
-			Mode:      p.Proxy.Mode,
-			PathKey:   p.Proxy.PathKey,
-			Targets:   p.Proxy.Targets,
-			Condition: p.Proxy.Config.Condition,
-			Tags:      tags,
+			ID:         id,
+			Name:       p.Proxy.Name,
+			ListenURLs: p.Proxy.ListenURLs,
+			Mode:       p.Proxy.Mode,
+			Targets:    p.Proxy.Targets,
+			Condition:  p.Proxy.Config.Condition,
+			Tags:       tags,
 		})
 	}
 
@@ -44,7 +44,9 @@ func (s *Supervisor) ListProxies(ctx context.Context, sortBy string, sortDesc bo
 			case "id":
 				result = configs[i].ID < configs[j].ID
 			case "listen_url":
-				result = configs[i].ListenURL < configs[j].ListenURL
+				result = configs[i].ListenURLs[0].ListenURL < configs[j].ListenURLs[0].ListenURL
+			case "name":
+				result = configs[i].Name < configs[j].Name
 			case "mode":
 				result = configs[i].Mode < configs[j].Mode
 			case "targets":

@@ -12,12 +12,13 @@ const (
 	ConditionTypeCookie    ConditionType = "cookie"
 	ConditionTypeUserAgent ConditionType = "user_agent"
 	ConditionTypeLanguage  ConditionType = "language"
+	ConditionTypeExpr      ConditionType = "expr"
 )
 
 func (ct ConditionType) IsValid() bool {
 	switch ct {
 	case ConditionTypeHeader, ConditionTypeQuery, ConditionTypeCookie,
-		ConditionTypeUserAgent, ConditionTypeLanguage:
+		ConditionTypeUserAgent, ConditionTypeLanguage, ConditionTypeExpr:
 		return true
 	}
 	return false
@@ -25,14 +26,16 @@ func (ct ConditionType) IsValid() bool {
 
 // RouteCondition represents a condition for routing traffic
 type RouteCondition struct {
-	Type      ConditionType     `json:"type" db:"type"`        // Type of condition: "header", "query", "cookie", "user_agent", "language"
-	ParamName string            `json:"param_name" db:"param"` // Name of the parameter to check (for header, query, cookie)
-	Values    map[string]string `json:"values" db:"values"`    // List of values to match targets by id
-	Default   string            `json:"default" db:"default"`  // Default target ID if no match is found
+	Type      ConditionType     `json:"type" db:"type"`           // Type of condition: "header", "query", "cookie", "user_agent", "language", "expr"
+	ParamName string            `json:"param_name" db:"param"`    // Name of the parameter to check (for header, query, cookie) or expression for expr type
+	Values    map[string]string `json:"values" db:"values"`       // List of values to match targets by id or expressions for expr type
+	Default   string            `json:"default" db:"default"`     // Default target ID if no match is found
+	Expr      string            `json:"expr,omitempty" db:"expr"` // Expression for expr type condition
 }
 
 type Target struct {
 	ID       string  `json:"id" db:"id"`
+	Name     string  `json:"name" db:"name"`
 	URL      string  `json:"url" db:"url"`
 	Weight   float64 `json:"weight" db:"weight"`
 	IsActive bool    `json:"is_active" db:"is_active"`

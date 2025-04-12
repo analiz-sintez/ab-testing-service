@@ -9,13 +9,6 @@ import (
 	"github.com/google/uuid"
 )
 
-type RedirectInfo struct {
-	RID   string // Redirect ID (same for all users within proxy)
-	RRID  string // Redirect Request ID (unique per click)
-	RUID  string // Redirect User ID (unique per user)
-	Query url.Values
-}
-
 func (p *Proxy) appendRedirectParams(targetURL string, info *RedirectInfo) string {
 	u, err := url.Parse(targetURL)
 	if err != nil {
@@ -30,10 +23,19 @@ func (p *Proxy) appendRedirectParams(targetURL string, info *RedirectInfo) strin
 	query.Set("rrid", info.RRID)
 	query.Set("ruid", info.RUID)
 
-	// Add all original query parameters
-	for key, values := range info.Query {
-		for _, value := range values {
-			query.Add(key, value)
+	// Add all original query parameters if query forwarding is enabled
+	if p.QueryForwardingFlg {
+		for key, values := range info.Query {
+			for _, value := range values {
+				query.Add(key, value)
+			}
+		}
+	}
+
+	// Add cookies as query parameters if cookies forwarding is enabled
+	if p.CookiesForwardingFlg {
+		for _, cookie := range info.Cookies {
+			query.Add(fmt.Sprintf("cookie_%s", cookie.Name), cookie.Value)
 		}
 	}
 

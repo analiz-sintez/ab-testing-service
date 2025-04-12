@@ -50,7 +50,7 @@ func (s *Storage) SaveVisit(ctx context.Context, visit *models.Visit) error {
 func (s *Storage) GetProxies(ctx context.Context) ([]proxy.Config, error) {
 	var proxies []proxy.Config
 	rows, err := s.db.Query(ctx,
-		`SELECT id, listen_url, mode, condition, tags, path_key
+		`SELECT id, name, mode, condition, tags, saving_cookies_flg, query_forwarding_flg
 		FROM proxies ORDER BY created_at DESC`,
 	)
 	if err != nil {
@@ -63,9 +63,11 @@ func (s *Storage) GetProxies(ctx context.Context) ([]proxy.Config, error) {
 	}
 
 	for rows.Next() {
+		// failed to scan proxy: can't scan into dest[1]: cannot scan NULL into *string
 		var p models.Proxy
 		var conditionJSON []byte
-		if err := rows.Scan(&p.ID, &p.ListenURL, &p.Mode, &conditionJSON, &p.Tags, &p.PathKey); err != nil {
+		var name string
+		if err := rows.Scan(&p.ID, &name, &p.Mode, &conditionJSON, &p.Tags, &p.SavingCookiesFlg, &p.QueryForwardingFlg); err != nil {
 			return nil, fmt.Errorf("failed to scan proxy: %w", err)
 		}
 		if len(conditionJSON) > 0 {
@@ -76,26 +78,51 @@ func (s *Storage) GetProxies(ctx context.Context) ([]proxy.Config, error) {
 		}
 
 		config := proxy.Config{
-			ID:        p.ID,
-			ListenURL: p.ListenURL,
-			Mode:      p.Mode,
-			Tags:      p.Tags,
+			ID:                   p.ID,
+			Name:                 name,
+			Mode:                 p.Mode,
+			Tags:                 p.Tags,
+			SavingCookiesFlg:     p.SavingCookiesFlg,
+			QueryForwardingFlg:   p.QueryForwardingFlg,
+			CookiesForwardingFlg: p.CookiesForwardingFlg,
 		}
 
-		if p.PathKey != nil {
-			config.PathKey = *p.PathKey
+		// Fetch ListenURLs from proxy_listen_urls table
+		listenURLs, err := s.q.GetProxyListenURLs(ctx, p.ID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get listen URLs for proxy %s: %w", p.ID, err)
+		}
+
+		// Map ListenURLs to the models.Proxy and proxy.Config structures
+		for _, listenURL := range listenURLs {
+			// Add to models.Proxy
+			modelListenURL := models.ListenURL{
+				ID:        listenURL.ID,
+				ProxyID:   listenURL.ProxyID,
+				ListenURL: listenURL.ListenUrl,
+				PathKey:   listenURL.PathKey,
+			}
+			p.ListenURLs = append(p.ListenURLs, modelListenURL)
+
+			// Add to proxy.Config
+			configListenURL := proxy.ListenURL{
+				ID:        listenURL.ID,
+				ListenURL: listenURL.ListenUrl,
+				PathKey:   listenURL.PathKey,
+			}
+			config.ListenURLs = append(config.ListenURLs, configListenURL)
 		}
 
 		condition, err := convertCondition(p.Condition)
 		if err != nil {
-			// Обработка ошибки
+			// Error handling
 			log.Printf("Failed to convert condition for proxy %s: %v", p.ID, err)
-			// Возможные варианты:
-			// 1. Пропустить этот прокси
+			// Possible options:
+			// 1. Skip this proxy
 			//continue
-			// 2. Вернуть ошибку выше
+			// 2. Return error
 			//return nil, fmt.Errorf("failed to process proxy %s: %w", p.ID, err)
-			// 3. Вернуть nil и продолжить обработку остальных прокси
+			// 3. Return nil and continue processing other proxies
 			//config.Condition = nil
 		}
 
@@ -124,6 +151,7 @@ func convertCondition(rc *models.RouteCondition) (*proxy.Condition, error) {
 		ParamName: rc.ParamName,
 		Values:    make(map[string]string),
 		Default:   rc.Default,
+		Expr:      rc.Expr,
 	}
 
 	// Копируем значения map, проверяя их валидность
@@ -135,24 +163,4 @@ func convertCondition(rc *models.RouteCondition) (*proxy.Condition, error) {
 	}
 
 	return condition, nil
-}
-
-func convertConditionSafe(rc *models.RouteCondition) (c *proxy.Condition, err error) {
-	// Защита от паники при конвертации
-	defer func() {
-		if r := recover(); r != nil {
-			err = fmt.Errorf("failed to convert condition: %v", r)
-		}
-	}()
-
-	if rc == nil {
-		return nil, nil
-	}
-
-	return &proxy.Condition{
-		Type:      rc.Type,
-		ParamName: rc.ParamName,
-		Values:    rc.Values,
-		Default:   rc.Default,
-	}, nil
 }
